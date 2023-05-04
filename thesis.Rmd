@@ -1,0 +1,833 @@
+---
+title: "survival analysis"
+author: "Kvan Valerii"
+date: '2022-12-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+library(haven)
+library(survminer)
+library(survival)
+library(pROC)
+```
+
+# Data preprocessing
+
+```{r}
+df = read_sas("wls_bl_14.01.sas/wls_bl_14_01.sas7bdat")
+head(df)
+```
+
+```{r}
+table(df$z_sexrsp)
+```
+```{r}
+9638 * 100 / 19046
+```
+
+```{r}
+9408  * 100 / 19046
+```
+
+
+
+
+```{r}
+turley_df = read.csv(file="polygenic scores/Turley/Turley_idpub_shuffled.txt", sep="\t")
+head(turley_df)
+```
+
+```{r}
+df_merged_tmp <- merge(x=df, y=turley_df, by="idpub", all.x = TRUE)
+
+df_merged_tmp <- merge(df, turley_df, by="idpub")
+
+df_only_graduates_pgs <- merge(df_only_graduates, turley_df, by="idpub")
+
+
+turley_df[is.na(turley_df$pgs_dep_gwas),]$pgs_dep_gwas 
+```
+
+
+```{r}
+df_merged = df #todo merge df_turly with df
+df_merged = df_merged[df_merged$z_brdxdy != -3, ]
+df_merged$z_brdxdy = df_merged$z_brdxdy + 1900
+
+#dead/unknown status
+df_merged$death_status = FALSE
+df_merged[(df_merged$z_deatyr < 2023) & (df_merged$z_deatyr != -2),]$death_status = TRUE
+
+#calculate age
+df_merged$surv_years = -1
+
+#for those who has year of death
+predicat = (df_merged$z_deatyr < 2023) & (df_merged$z_deatyr != -2)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_deatyr - df_merged[predicat,]$z_brdxdy
+
+#for those who has not
+death_predicat = (df_merged$z_deatyr == -2) | (df_merged$z_deatyr > 2023)
+predicat = (death_predicat) & (df_merged$z_age75 > 0)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_age75
+
+predicat = (death_predicat) & (df_merged$z_ra029re > 0)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_ra029re
+
+predicat = (death_predicat) & !is.na(df_merged$z_ga003re)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_ga003re
+
+predicat = (death_predicat) & !is.na(df_merged$z_ha003re)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_ha003re
+
+predicat = (death_predicat) & !is.na(df_merged$z_q1a003re)
+df_merged[predicat, ]$surv_years =  df_merged[predicat,]$z_q1a003re
+```
+
+## Check those who has nothing to calculate approximate age
+
+```{r}
+unique(df_merged[df_merged$surv_years == -1,]$liv64)
+```
+
+```{r}
+df_merged[df_merged$surv_years == -1,]
+```
+
+
+```{r}
+#first interview
+table(df_merged[df_merged$surv_years == -1,]$liv64
+)
+```
+we will remove those such candidates, because there is no info about theirs age
+
+```{r}
+df_merged = df_merged[df_merged$surv_years != -1,]
+```
+
+separate into graduates vs siblings groups
+
+```{r}
+tabledf[df$rtype == 'g',]
+df[df$rtype == 's',]
+#10,317 8,729  
+```
+
+
+```{r}
+df_only_graduates = df_merged[df_merged$rtype == 'g',]
+df_only_siblings = df_merged[df_merged$rtype == 's',]
+```
+
+
+
+
+```{r}
+y = Surv(time = df_only_graduates$surv_years, event = df_only_graduates$death_status == TRUE)
+```
+
+```{r}
+survfit(y ~ df_only_graduates)
+```
+
+```{r}
+library(ggplot2)
+library(ggfortify)
+```
+
+# Kaplan-Meier plots
+
+```{r}
+table(df_only_graduates$death_status)
+```
+
+```{r}
+1829  * 100 / 5427
+```
+
+
+
+```{r}
+autoplot(survfit(Surv(surv_years, death_status) ~ 1, data =  df_only_graduates))
+```
+
+
+```{r}
+kaplan_plot_strat <- function(model_survfit, labs) 
+{
+autoplot(model_survfit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = title, colour = title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = labs) +
+  scale_fill_discrete(labels = labs) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 14),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 14),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.15, 0.2),
+ legend.text = element_text(size=14))
+}
+```
+
+
+
+```{r}
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_sexrsp, data =  df_only_graduates)
+#kaplan_plot_strat(model_fit, labs = c("Male", "Female"))
+
+
+
+legened_title <- "Sex"
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = legened_title, colour = legened_title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = c("Male", "Female")) +
+  scale_fill_discrete(labels = c("Male", "Female")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 14),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 14),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.15, 0.2),
+ legend.text = element_text(size=14))
+```
+
+
+```{r}
+#R5 Has a doctor ever told you that you have diabetes?
+
+#1 - YES
+#2 - NO
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_gx342re, data =  df_only_graduates[(df_only_graduates$z_gx342re == 1) | (df_only_graduates$z_gx342re == 2), ])
+
+legened_title <- "Has diabetes?"
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = legened_title, colour = legened_title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = c("Yes", "No")) +
+  scale_fill_discrete(labels = c("Yes", "No")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 12),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 12),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.15, 0.2),
+ legend.text = element_text(size=14))
+```
+
+
+
+```{r}
+#R5 Has a doctor ever told you that you have high blood sugar?
+
+#1 - YES
+#2 - NO
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_gx346re, data =  df_only_graduates[(df_only_graduates$z_gx346re == 1) | (df_only_graduates$z_gx346re == 2), ])
+
+legened_title <- "Has high\nblood sugar?"
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = legened_title, colour = legened_title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = c("Yes", "No")) +
+  scale_fill_discrete(labels = c("Yes", "No")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 12),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 12),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.15, 0.2),
+ legend.text = element_text(size=14))
+```
+
+
+```{r}
+#R5 as a doctor ever told you that you have cancer or a malignant tumor, not including minor skin cancers?
+#1 - YES
+#2 - NO
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_gx348re, data =  df_only_graduates[(df_only_graduates$z_gx348re == 1) | (df_only_graduates$z_gx348re == 2), ])
+
+legened_title <- "Has cancers?"
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = legened_title, colour = legened_title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = c("Yes", "No")) +
+  scale_fill_discrete(labels = c("Yes", "No")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 12),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 12),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.2, 0.2),
+ legend.text = element_text(size=14))
+```
+
+
+
+```{r}
+
+#R5 Did you have a heart attack or myocardial infarction?
+#1 - YES
+#2 - NO
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_gx352re, data =  df_only_graduates[(df_only_graduates$z_gx352re == 1) | (df_only_graduates$z_gx352re == 2), ])
+
+legened_title <- "Has heart attack?"
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = legened_title, colour = legened_title, title = "Survival Time of Graduates") +
+ scale_color_discrete(labels = c("Yes", "No")) +
+  scale_fill_discrete(labels = c("Yes", "No")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 12),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 12),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.2, 0.2),
+ legend.text = element_text(size=14))
+
+```
+
+
+
+```{r}
+
+#1 - YES
+#2 - NO
+
+model_fit <- survfit(Surv(surv_years, death_status) ~ z_gx356re, data =  df_only_graduates[(df_only_graduates$z_gx356re == 1) | (df_only_graduates$z_gx356re == 2), ])
+
+autoplot(model_fit) +
+ labs(x = "\n Survival Time (Years) ", y = "Survival Probabilities \n",
+       fill = "Has stroke?", colour = "Has stroke?", title = "Survival Time of Graduates") +
+ scale_color_discrete(name="Has stroke?", labels = c("Yes", "No")) +
+  scale_fill_discrete(name="Has stroke?", labels = c("Yes", "No")) +
+ theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 12),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 12),
+ legend.title = element_text(face="bold", size = 14),
+ legend.position = c(0.15, 0.2),
+ legend.text = element_text(size=14))
+```
+
+# Check that missing data only applied to the same people.
+
+```{r}
+identical(df_merged[is.na(df_merged$z_gx356re),]$idpub,
+          df_merged[is.na(df_merged$z_gx351re),]$idpub)
+```
+```{r}
+identical(df_merged[is.na(df_merged$z_gx356re),]$idpub,
+          df_merged[is.na(df_merged$z_gx352re),]$idpub)
+```
+```{r}
+#remove NA
+df_only_graduates = df_only_graduates[!is.na(df_only_graduates$z_gx356re),] 
+unique(df_only_graduates$z_gx356re)
+```
+
+
+```{r}
+table(df_only_graduates$z_gx356re)
+```
+
+
+# Cox model
+
+```{r}
+df_only_graduates$death_status <- df_only_graduates$death_status + 0
+
+df_only_graduates$z_sexrsp <- as.factor(df_only_graduates$z_sexrsp)
+
+df_only_graduates$z_gx352re <- as.factor(df_only_graduates$z_gx352re)
+df_only_graduates$z_gx342re <- as.factor(df_only_graduates$z_gx342re)
+df_only_graduates$z_gx346re <- as.factor(df_only_graduates$z_gx346re)
+df_only_graduates$z_gx348re <- as.factor(df_only_graduates$z_gx348re)
+df_only_graduates$z_gx356re <- as.factor(df_only_graduates$z_gx356re)
+```
+
+
+```{r}
+table(df_only_graduates$z_gx352re)
+```
+
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx356re == "-1",]$death_status
+```
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx356re == "-3",]$death_status
+```
+
+
+```{r}
+unique(df_only_graduates$z_gx356re)
+```
+
+```{r}
+cox.mod <- coxph(Surv(surv_years, death_status) ~ z_gx356re,  data = df_only_graduates)
+summary(cox.mod)
+```
+
+```{r}
+autoplot(survfit(cox.mod))
+```
+
+
+
+```{r}
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx356re != "-3",]
+df_only_graduates$z_gx356re <- droplevels(df_only_graduates$z_gx356re)
+```
+
+
+```{r}
+unique(df_only_graduates$z_gx356re)
+```
+
+
+
+```{r}
+#z_gx346re + z_gx348re + z_gx352re + z_gx356re
+cox.mod <- coxph(Surv(surv_years, death_status) ~ z_gx356re,  data = df_only_graduates)
+summary(cox.mod)
+```
+
+```{r}
+autoplot(survfit(cox.mod))
+```
+
+```{r}
+table(df_only_graduates$z_gx342re)
+```
+```{r}
+df_only_graduates[df_only_graduates$z_gx342re == "-1", ]$death_status
+```
+
+
+
+
+```{r}
+table(df_only_graduates$z_gx346re)
+```
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx342re == "-1", ]$death_status
+```
+
+
+```{r}
+table(df_only_graduates$z_gx348re)
+```
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx348re == "-1", ]$death_status
+```
+
+
+```{r}
+table(df_only_graduates$z_gx346re)
+```
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx352re == "-1", ]$death_status
+```
+
+
+
+
+```{r}
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx342re != "-3",]
+df_only_graduates$z_gx342re <- droplevels(df_only_graduates$z_gx342re)
+
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx346re != "-3",]
+df_only_graduates$z_gx346re <- droplevels(df_only_graduates$z_gx346re)
+
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx348re != "-3",]
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx348re != "-1",]
+df_only_graduates$z_gx348re <- droplevels(df_only_graduates$z_gx348re)
+
+df_only_graduates <- df_only_graduates[df_only_graduates$z_gx352re != "-3",]
+df_only_graduates$z_gx352re <- droplevels(df_only_graduates$z_gx352re)
+
+```
+
+```{r}
+unique(df_only_graduates$z_gx348re)
+```
+
+
+```{r}
+df_only_graduates[df_only_graduates$z_gx342re == -3, ]$death_status
+```
+
+
+```{r}
+cox.mod <- coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx352re + z_gx346re +
+               z_gx348re + z_gx356re,  data = df_only_graduates)
+summary(cox.mod)
+```
+
+```{r}
+autoplot(survfit(cox.mod))
+```
+
+
+```{r}
+aa_fit <-aareg(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx348re + z_gx352re + z_gx356re,  data = df_only_graduates)
+autoplot(aa_fit)
+```
+
+
+```{r}
+
+ggforest(cox.mod)
+```
+
+# Evaluating the model
+
+```{r}
+levels(df_only_graduates_tmp$z_gx352re)
+```
+
+
+```{r}
+cox.zph(cox.mod)
+```
+
+
+```{r}
+#difference between covariate value at the event time ant the correspoding risk-weighted average (Schoenfeld residuals)
+par(mfrow=c(2,2))
+plot(cox.zph(cox.mod))
+```
+
+
+```{r}
+#z_gx346re + z_gx348re + z_gx352re + z_gx356re
+
+test <- df_only_siblings[1, ]
+test$z_sexrsp <- as.factor(test$z_sexrsp)
+test$z_gx342re <- as.factor(test$z_gx342re)
+test$z_gx352re <- as.factor(test$z_gx352re)
+test$z_gx348re <- as.factor(test$z_gx348re)
+test$z_gx346re <- as.factor(test$z_gx346re)
+test$z_gx356re <- as.factor(test$z_gx356re)
+
+test$death_status
+```
+
+```{r}
+test[,c('death_status','z_gx342re', 'z_gx346re', 'z_gx348re', 'z_gx346re', 'z_gx356re')]
+```
+
+
+
+```{r}
+test$z_gx356re <- as.factor(1)
+test$z_gx352re <- as.factor(1)
+test$z_gx346re <- as.factor(1)
+test$surv_years <- 80
+```
+
+
+
+```{r}
+predict(cox, test, type="expected")
+```
+
+```{r}
+exp(-predict(cox.mod_tmp, test, type="expected"))
+```
+
+```{r}
+predict(cox, test, type="risk")
+```
+
+
+
+```{r}
+unique(df_only_graduates_tmp$z_gx356re)
+```
+
+```{r}
+table(df_only_graduates_tmp$z_gx356re)
+```
+
+
+```{r}
+df_only_graduates_tmp <- df_only_graduates
+
+df_only_graduates_tmp <- df_only_graduates_tmp[df_only_graduates_tmp$z_gx342re != "-1",]
+df_only_graduates_tmp$z_gx342re <- droplevels(df_only_graduates_tmp$z_gx342re)
+
+df_only_graduates_tmp <- df_only_graduates_tmp[df_only_graduates_tmp$z_gx346re != "-1",]
+df_only_graduates_tmp$z_gx346re <- droplevels(df_only_graduates_tmp$z_gx346re)
+
+df_only_graduates_tmp <- df_only_graduates_tmp[df_only_graduates_tmp$z_gx352re != "-1",]
+df_only_graduates_tmp$z_gx352re <- droplevels(df_only_graduates_tmp$z_gx352re)
+
+df_only_graduates_tmp <- df_only_graduates_tmp[df_only_graduates_tmp$z_gx356re != "-1",]
+df_only_graduates_tmp$z_gx356re <- droplevels(df_only_graduates_tmp$z_gx356re)
+
+```
+
+```{r}
+df_only_graduates_pgs
+```
+
+
+```{r}
+df_only_graduates_tmp$z_gx352re <- relevel(df_only_graduates_tmp$z_gx352re, "1")
+df_only_graduates_tmp$z_gx346re <- relevel(df_only_graduates_tmp$z_gx346re, "1")
+df_only_graduates_tmp$z_gx342re <- relevel(df_only_graduates_tmp$z_gx342re, "2")
+```
+
+```{r}
+levels(df_only_graduates_tmp$z_gx346re)
+```
+
+```{r}
+table(df_only_graduates_tmp$z_gx342re)
+```
+
+```{r}
+df_only_graduates_pgs <- merge(df_only_graduates_tmp, turley_df, by="idpub")
+```
+
+
+```{r}
+df_only_graduates_pgs[is.na(df_only_graduates_pgs$z_gx356re), ]
+```
+
+
+```{r}
+coxph(Surv(surv_years, death_status) ~ pgs_dep_gwas,  data = df_only_graduates_pgs)
+```
+
+```{r}
+coxph(Surv(surv_years, death_status) ~ pgs_neur_gwas,  data = df_only_graduates_pgs)
+```
+
+```{r}
+coxph(Surv(surv_years, death_status) ~ pgs_dep_gwas + pgs_neur_gwas,  data = df_only_graduates_pgs)
+```
+
+```{r}
+plot(df_only_graduates_pgs$pgs_dep_gwas, df_only_graduates_pgs$pgs_swb_gwas)
+summary(lm(pgs_dep_gwas ~ pgs_swb_gwas, data = df_only_graduates_pgs))
+```
+
+
+
+```{r}
+coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx348re + z_gx356re + pgs_dep_gwas,  data = df_only_graduates_pgs)
+```
+
+
+
+```{r}
+cox.mod_tmp <- coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx348re + z_gx356re + pgs_dep_gwas,  data = df_only_graduates_pgs)
+summary(cox.mod_tmp)
+```
+
+```{r}
+cox.mod_tmp <- coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx348re + z_gx356re + pgs_dep_gwas,  data = df_only_graduates_pgs)
+s <- summary(cox.mod_tmp)
+
+tmp_df <- df_only_graduates_pgs %>% select(z_sexrsp, surv_years, death_status)
+
+
+
+n <- length(s$coefficients) / 5
+i <- n * 4
+s$coefficients[i + 2]
+```
+
+```{r}
+coxph(formula = as.formula(paste("Surv(surv_years, death_status) ~ ","z_sexrsp")),  data = df_only_graduates_pgs)
+```
+
+
+
+```{r}
+autoplot(survfit(cox.mod_tmp))
+```
+
+
+```{r}
+temp_df <- df_only_graduates_tmp
+levels(temp_df$z_sexrsp) <- c("male", "female")
+levels(temp_df$z_gx342re ) <- c("no", "yes")
+levels(temp_df$z_gx346re ) <- c("yes", "inappropriate", "no")
+levels(temp_df$z_gx348re ) <- c("yes", "no")
+levels(temp_df$z_gx352re ) <- c("yes", "inappropriate", "no")
+levels(temp_df$z_gx356re ) <- c("yes", "no")
+```
+
+```{r}
+19046 - 16335
+```
+
+
+```{r}
+ggforest(cox.mod_tmp)
+```
+
+
+```{r}
+aa_fit <-aareg(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx348re + z_gx352re + z_gx356re,  data = df_only_graduates)
+autoplot(aa_fit)
+```
+
+
+```{r}
+cox.zph(cox.mod_tmp)
+```
+
+
+
+```{r}
+par(mfrow=c(1,1))
+plot(cox.zph(cox.mod_tmp))
+```
+
+
+```{r}
+#likelihood ratio test
+#H_0 no difference between models
+anova(coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx346re + z_gx352re +
+               z_gx348re + z_gx356re,  data = df_only_graduates_tmp), 
+      coxph(Surv(surv_years, death_status) ~ z_sexrsp + z_gx352re + z_gx346re +
+               z_gx348re,  data = df_only_graduates_tmp), test="LRT")
+```
+
+```{r}
+test <- select(df_only_siblings, surv_years, death_status, z_sexrsp, z_gx346re, z_gx348re, z_gx352re, z_gx356re, idpub)
+
+test <- test[!is.na(test$z_gx352re),]
+
+test$z_sexrsp <- as.factor(test$z_sexrsp)
+#test$z_gx342re <- as.factor(test$z_gx342re)
+test$z_gx352re <- as.factor(test$z_gx352re)
+test$z_gx348re <- as.factor(test$z_gx348re)
+test$z_gx346re <- as.factor(test$z_gx346re)
+test$z_gx356re <- as.factor(test$z_gx356re)
+
+#test<- test[test$z_gx342re != "-3",]
+#test<- test[test$z_gx342re != "-1",]
+#test$z_gx342re <- droplevels(test$z_gx342re)
+
+test<- test[test$z_gx346re != "-3",]
+test<- test[test$z_gx346re != "-1",]
+test$z_gx346re <- droplevels(test$z_gx346re)
+
+test<- test[test$z_gx348re != "-3",]
+test<- test[test$z_gx348re != "-1",]
+test$z_gx348re <- droplevels(test$z_gx348re)
+
+test<- test[test$z_gx352re != "-1",]
+test$z_gx352re <- droplevels(test$z_gx352re)
+
+test<- test[test$z_gx356re != "-3",]
+test<- test[test$z_gx356re != "-1",]
+test$z_gx356re <- droplevels(test$z_gx356re)
+
+levels(test$z_gx352re)
+```
+
+```{r}
+test$z_gx346re <- relevel(test$z_gx346re, "1")
+```
+
+
+```{r}
+table(test$z_gx346re)
+```
+
+```{r}
+test[ is.na(test$z_sexrsp),]
+```
+
+```{r}
+test_pgs <- merge(test, turley_df, by="idpub")
+```
+
+
+```{r}
+p_vals <- seq(0.00, 1.0, by=0.05)
+true_vals <- test_pgs$death_status
+
+tpr <- list()
+fpr <- list()
+
+for (p in p_vals)
+{
+  probs <- exp(-predict(cox.mod_tmp, test_pgs, type="expected"))
+  pred <- (probs < p) + 0
+  
+  true_predicted <- pred[(pred == true_vals)]
+  false_predicted <- pred[(pred != true_vals)]
+  
+  tp <- sum(true_predicted == 1, na.rm = TRUE)
+  fp <- sum(false_predicted == 1, na.rm = TRUE)
+  
+  tn <- sum(true_predicted == 0, na.rm = TRUE)
+  fn <- sum(false_predicted == 0, na.rm = TRUE)
+  
+  tpr <- append(tpr, tp / (tp + fn))
+  fpr <- append(fpr, fp / (fp + tn))
+}
+
+
+```
+
+```{r}
+table(pred)
+```
+
+```{r}
+p_vals[18]
+```
+
+
+```{r}
+data <- data.frame(
+  x = unlist(fpr),
+  y = unlist(tpr)
+)
+
+ggplot(data = data, aes(x = x, y = y)) +
+  geom_line(color = "blue") + geom_point(color="red") + 
+  labs(title = "ROC curve", 
+       x = "False positive rate", 
+       y = "True positive rate") +
+  theme(plot.title = element_text(hjust = 0.5), 
+ axis.title.x = element_text(face="bold", colour="#FF7A33", size = 14),
+ axis.title.y = element_text(face="bold", colour="#FF7A33", size = 14))
+```
+
+
+```{r}
+auc(true_vals, pred)
+```
+
+
+
+```{r}
+
+sum(true_predicted == 1, na.rm = TRUE)
+```
+

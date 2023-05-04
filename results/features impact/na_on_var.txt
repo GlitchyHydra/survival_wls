@@ -1,0 +1,4 @@
+           sflag z_jk0908re occl57
+sflag         NA         NA     NA
+z_jk0908re    NA         NA     NA
+occl57        NA         NA     NA

@@ -1,0 +1,3 @@
+write how the data were preprocessed as it were in random forest article with scheme (PCE/all data/EHR including data)
+maybe separate dataset to graduate/siblings and compare it with whole dataset by AUC/ROC.
+Firstly create rf with whole dataset, than with graduate/siblings separately.

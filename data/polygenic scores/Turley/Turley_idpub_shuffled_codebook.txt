@@ -1,0 +1,322 @@
+ 
+ 
+. use Turley_idpub_shuffled.dta
+
+. 
+. describe
+
+Contains data from Turley_idpub_shuffled.dta
+  obs:         8,509                          
+ vars:            18                          9 Apr 2018 21:14
+ size:     1,131,697                          
+-------------------------------------------------------------------------------
+              storage   display    value
+variable name   type    format     label      variable label
+-------------------------------------------------------------------------------
+idpub           long    %12.0g                Public data release ID for
+                                                version 12.24. On downloadable
+                                                data. Replaced iduser.
+rtype           str1    %9s                   Grad or Sib Participant
+pgs_dep_gwas    double  %10.0g                PGS_DEP_GWAS
+pgs_neur_gwas   double  %10.0g                PGS_NEUR_GWAS
+pgs_swb_gwas    double  %10.0g                PGS_SWB_GWAS
+pgs_dep_mtag    double  %10.0g                PGS_DEP_MTAG
+pgs_neur_mtag   double  %10.0g                PGS_NEUR_MTAG
+pgs_swb_mtag    double  %10.0g                PGS_SWB_MTAG
+pc1_shuffled    double  %10.0g                Principal Component Set 1_5: Must
+                                                use all five PC in set 1-5
+pc2_shuffled    double  %10.0g                Principal Component Set 1_5: Must
+                                                use all five PC in set 1-5
+pc3_shuffled    double  %10.0g                Principal Component Set 1_5: Must
+                                                use all five PC in set 1-5
+pc4_shuffled    double  %10.0g                Principal Component Set 1_5: Must
+                                                use all five PC in set 1-5
+pc5_shuffled    double  %10.0g                Principal Component Set 1_5: Must
+                                                use all five PC in set 1-5
+pc6_shuffled    double  %10.0g                Principal Component Set 6_10:
+                                                Must use all 10 PC
+pc7_shuffled    double  %10.0g                Principal Component Set 6_10:
+                                                Must use all 10 PC
+pc8_shuffled    double  %10.0g                Principal Component Set 6_10:
+                                                Must use all 10 PC
+pc9_shuffled    double  %10.0g                Principal Component Set 6_10:
+                                                Must use all 10 PC
+pc10_shuffled   double  %10.0g                Principal Component Set 6_10:
+                                                Must use all 10 PC
+-------------------------------------------------------------------------------
+Sorted by: 
+
+. codebook
+
+-------------------------------------------------------------------------------
+idpub                                  Public data release ID for version
+                                       12.24. On downloadable data. Replaced
+                                       iduser.
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [900026,933957]              units:  1
+         unique values:  6,445                    missing .:  0/8,509
+
+                  mean:    916863
+              std. dev:   9860.19
+
+           percentiles:        10%       25%       50%       75%       90%
+                            903269    908211    916707    925563    930547
+
+-------------------------------------------------------------------------------
+rtype                                                   Grad or Sib Participant
+-------------------------------------------------------------------------------
+
+                  type:  string (str1)
+
+         unique values:  2                        missing "":  0/8,509
+
+            tabulation:  Freq.  Value
+                         5,414  "g"
+                         3,095  "s"
+
+-------------------------------------------------------------------------------
+pgs_dep_gwas                                                       PGS_DEP_GWAS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.28087,.28363]             units:  .00001
+         unique values:  7,260                    missing .:  0/8,509
+
+                  mean:  -.004447
+              std. dev:   .069567
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.09297   -.05107   -.00403    .04189    .08594
+
+-------------------------------------------------------------------------------
+pgs_neur_gwas                                                     PGS_NEUR_GWAS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.16917,.34336]             units:  .00001
+         unique values:  7,140                    missing .:  0/8,509
+
+                  mean:   .082052
+              std. dev:   .068525
+
+           percentiles:        10%       25%       50%       75%       90%
+                             -.005    .03682    .08169     .1277     .1696
+
+-------------------------------------------------------------------------------
+pgs_swb_gwas                                                       PGS_SWB_GWAS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.19134,.19148]             units:  .00001
+         unique values:  6,688                    missing .:  0/8,509
+
+                  mean:  -.007652
+              std. dev:    .04864
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.06986   -.04041   -.00781    .02524     .0537
+
+-------------------------------------------------------------------------------
+pgs_dep_mtag                                                       PGS_DEP_MTAG
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.29285,.32485]             units:  .00001
+         unique values:  7,378                    missing .:  0/8,509
+
+                  mean:   .021612
+              std. dev:   .080859
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.08271   -.03265    .02251    .07627    .12516
+
+-------------------------------------------------------------------------------
+pgs_neur_mtag                                                     PGS_NEUR_MTAG
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.29144,.4353]              units:  .00001
+         unique values:  7,582                    missing .:  0/8,509
+
+                  mean:   .080572
+              std. dev:   .099786
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.04858    .01374    .08132    .14795    .20875
+
+-------------------------------------------------------------------------------
+pgs_swb_mtag                                                       PGS_SWB_MTAG
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.2705,.24829]              units:  .00001
+         unique values:  7,196                    missing .:  0/8,509
+
+                  mean:  -.025633
+              std. dev:   .067818
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.11185   -.07093    -.0263    .01945    .06239
+
+-------------------------------------------------------------------------------
+pc1_shuffled       Principal Component Set 1_5: Must use all five PC in set 1-5
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.44729,.02192]             units:  .00001
+         unique values:  1,764                    missing .:  0/8,509
+
+                  mean:  -7.4e-06
+              std. dev:   .010836
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.00444   -.00213    .00022    .00257    .00505
+
+-------------------------------------------------------------------------------
+pc2_shuffled       Principal Component Set 1_5: Must use all five PC in set 1-5
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.04125,.05272]             units:  .00001
+         unique values:  3,350                    missing .:  0/8,509
+
+                  mean:   .000035
+              std. dev:    .01083
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.01056   -.00755   -.00206    .00589    .01376
+
+-------------------------------------------------------------------------------
+pc3_shuffled       Principal Component Set 1_5: Must use all five PC in set 1-5
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.07439,.03543]             units:  .00001
+         unique values:  3,044                    missing .:  0/8,509
+
+                  mean:   .000026
+              std. dev:    .01081
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.01248   -.00203    .00219    .00585    .00921
+
+-------------------------------------------------------------------------------
+pc4_shuffled       Principal Component Set 1_5: Must use all five PC in set 1-5
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.0229,.01099]              units:  .00001
+         unique values:  1,380                    missing .:  0/8,509
+
+                  mean:   .000296
+              std. dev:   .002837
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.00324   -.00153    .00026    .00211    .00388
+
+-------------------------------------------------------------------------------
+pc5_shuffled       Principal Component Set 1_5: Must use all five PC in set 1-5
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.02623,.09895]             units:  .00001
+         unique values:  2,936                    missing .:  0/8,509
+
+                  mean:   .000036
+              std. dev:   .010836
+
+           percentiles:        10%       25%       50%       75%       90%
+                            -.0099    -.0051   -.00072    .00393    .00848
+
+-------------------------------------------------------------------------------
+pc6_shuffled                   Principal Component Set 6_10: Must use all 10 PC
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.07552,.13937]             units:  .00001
+         unique values:  3,218                    missing .:  0/8,509
+
+                  mean:   .000043
+              std. dev:   .010777
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.01066   -.00517   -.00015    .00478    .00991
+
+-------------------------------------------------------------------------------
+pc7_shuffled                   Principal Component Set 6_10: Must use all 10 PC
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.16049,.13443]             units:  .00001
+         unique values:  3,127                    missing .:  0/8,509
+
+                  mean:  -.000034
+              std. dev:   .010786
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.01003   -.00464   -.00003    .00444     .0096
+
+-------------------------------------------------------------------------------
+pc8_shuffled                   Principal Component Set 6_10: Must use all 10 PC
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.07068,.03787]             units:  .00001
+         unique values:  3,408                    missing .:  0/8,509
+
+                  mean:   .000029
+              std. dev:   .010796
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.01209   -.00475    .00114     .0064    .01151
+
+-------------------------------------------------------------------------------
+pc9_shuffled                   Principal Component Set 6_10: Must use all 10 PC
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.16901,.46983]             units:  .00001
+         unique values:  1,666                    missing .:  0/8,509
+
+                  mean:   .000016
+              std. dev:   .010832
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.00458   -.00246    -.0001    .00224    .00433
+
+-------------------------------------------------------------------------------
+pc10_shuffled                  Principal Component Set 6_10: Must use all 10 PC
+-------------------------------------------------------------------------------
+
+                  type:  numeric (double)
+
+                 range:  [-.10658,.41588]             units:  .00001
+         unique values:  2,628                    missing .:  0/8,509
+
+                  mean:  -.000036
+              std. dev:   .010775
+
+           percentiles:        10%       25%       50%       75%       90%
+                           -.00787   -.00387   -.00018    .00355    .00747
+
+. exit
+
+end of do-file

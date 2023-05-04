@@ -1,0 +1,38 @@
+> summary(cox.mod)
+Call:
+coxph(formula = as.formula(paste("Surv(surv_years, death_status) ~ ", 
+    param_str)), data = data_new_transformed_fixed[, sel])
+
+  n= 9828, number of events= 2360 
+   (6353 observations deleted due to missingness)
+
+                   coef  exp(coef)   se(coef)      z Pr(>|z|)  
+z_ixw11rer-2 -1.116e+00  3.277e-01  4.789e-01 -2.329   0.0198 *
+z_ixw11rer-1 -1.306e+01  2.120e-06  4.256e+02 -0.031   0.9755  
+z_ixw11rer1  -1.363e+00  2.559e-01  1.096e+00 -1.243   0.2138  
+z_ixw11rer2  -1.181e+00  3.069e-01  6.330e-01 -1.866   0.0620 .
+z_ixw11rer3          NA         NA  0.000e+00     NA       NA  
+z_ixw11rer4  -5.862e-01  5.564e-01  5.343e-01 -1.097   0.2725  
+z_gm020re-4   5.016e-01  1.651e+00  6.164e-01  0.814   0.4158  
+z_gm020re-2   2.409e-01  1.272e+00  2.173e-01  1.109   0.2676  
+z_gm020re1   -2.012e-01  8.177e-01  2.174e-01 -0.926   0.3547  
+z_gm020re2    1.275e-01  1.136e+00  2.237e-01  0.570   0.5686  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+             exp(coef) exp(-coef) lower .95 upper .95
+z_ixw11rer-2 3.277e-01  3.051e+00   0.12819    0.8379
+z_ixw11rer-1 2.120e-06  4.717e+05   0.00000       Inf
+z_ixw11rer1  2.559e-01  3.908e+00   0.02983    2.1944
+z_ixw11rer2  3.069e-01  3.259e+00   0.08874    1.0611
+z_ixw11rer3         NA         NA        NA        NA
+z_ixw11rer4  5.564e-01  1.797e+00   0.19526    1.5856
+z_gm020re-4  1.651e+00  6.055e-01   0.49336    5.5278
+z_gm020re-2  1.272e+00  7.859e-01   0.83109    1.9479
+z_gm020re1   8.177e-01  1.223e+00   0.53402    1.2522
+z_gm020re2   1.136e+00  8.803e-01   0.73276    1.7612
+
+Concordance= 0.555  (se = 0.006 )
+Likelihood ratio test= 110.9  on 9 df,   p=<2e-16
+Wald test            = 111.3  on 9 df,   p=<2e-16
+Score (logrank) test = 114.6  on 9 df,   p=<2e-16

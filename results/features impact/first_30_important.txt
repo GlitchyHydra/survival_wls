@@ -1,0 +1,33 @@
+          X feature_name       p_value is_cat
+43       43      stat92m 1.009366e-313   TRUE
+48       48     xstat93m 3.219484e-281   TRUE
+1031   1031   z_xcat52_1 1.197766e-269   TRUE
+1067   1067   z_xcat64_1 1.533939e-210  FALSE
+49       49     xstatw05 2.494512e-205   TRUE
+45       45      ia008re 3.191371e-185   TRUE
+884     884   z_xcat03_1 1.338016e-182   TRUE
+871     871   z_xcatsta2 7.650530e-181  FALSE
+1013   1013   z_xcat46_1 6.572601e-171   TRUE
+1052   1052   z_xcat59_1 6.587596e-170   TRUE
+16       16    z_group91 1.179180e-169   TRUE
+5085   5085    z_gx201re 1.607972e-152   TRUE
+1055   1055   z_xcat60_1 3.938504e-138   TRUE
+137     137   z_iqsource 3.557615e-137   TRUE
+10       10        srel2 7.304200e-135   TRUE
+1040   1040   z_xcat55_1 4.934612e-102   TRUE
+28       28    z_statk11 1.670896e-100   TRUE
+31       31    z_statc11 4.968929e-100   TRUE
+1034   1034   z_xcat53_1  1.007620e-97   TRUE
+---------------------------------------------
+
+5089   5089   z_gx202bma  1.211791e-90  FALSE
+12013 12013    z_ha102re  1.011150e-86   TRUE
+9617   9617    z_hx317re  4.108861e-85   TRUE
+5123   5123    z_gx316re  4.598969e-85   TRUE
+6935   6935   z_ix014rer  1.242240e-83  FALSE
+6644   6644   z_ixsf1rec  1.011743e-82  FALSE
+9590   9590   z_hx206lre  5.227409e-82   TRUE
+5097   5097   z_gx206lre  1.613196e-81   TRUE
+995     995   z_xcat40_1  4.875276e-81   TRUE
+7005   7005   z_ixhi20re  5.364494e-80  FALSE
+5147   5147    z_gx340re  8.482036e-80   TRUE
