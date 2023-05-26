@@ -10,7 +10,7 @@ extract_coeff_data <- function(dataset)
   
   for (col in cols)
   {
-    cox.mod = coxph(formula = as.formula(paste("Surv(surv_years, death_status) ~ ",
+    cox.mod = coxph(formula = as.formula(paste("Surv(time, death_status) ~ ",
                                                col)),
                     data = dataset)
     
@@ -46,6 +46,8 @@ transform_by_hazards <- function(dataset, hazard_df)
   cols = colnames(dataset)[1:l]
   for (col in cols)
   {
+    if (col == "time" || col == "death_status")
+      next
     
     if (!is.factor(dataset[,col]))
     {

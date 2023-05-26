@@ -2,21 +2,6 @@ library(svMisc)
 library(progress)
 library(pracma)
 
-get_all_by_level <- function(dataset, col, lvl)
-{
-  tmp = dataset[!is.na(dataset[,col]),]
-  return (tmp[tmp[,col] == lvl,])
-}
-
-remove_rows_by_level <- function(dataset, col, lvl)
-{
-  dataset$row_id = row.names(dataset)
-  tmp = dataset[!is.na(dataset[,col]),]
-  row_names = row.names(tmp[tmp[,col] == lvl,])
-  dataset <- dataset[!dataset$row_id %in% row_names, ]
-  dataset[,col] <- droplevels(dataset[,col])
-  return (dataset)
-}
 
 #validate that train/test dataset separate
 #that death are preserved
@@ -32,7 +17,7 @@ validate_separation <- function(train, test)
   
   for (col in cols)
   {
-    if (col %in% c("death_status", "surv_years") || !is.factor(train[,col]))
+    if (col %in% c("death_status", "time") || !is.factor(train[,col]))
       next
     
     is_need_to_droplevels = FALSE
@@ -97,7 +82,7 @@ separate_dataset <- function(dataset,
 get_param_str <- function(cols)
 {
   param_str = ""
-  cols <- cols[!cols %in% c("death_status", "surv_years")]
+  cols <- cols[!cols %in% c("death_status", "time")]
   
   for (i in 1:(length(cols) -1))
   {
@@ -109,152 +94,66 @@ get_param_str <- function(cols)
   return (param_str)
 }
 
-get_roc_curve_data <- function(dataset)
+train_coxph <- function(train)
 {
-  param_str = get_param_str(colnames(dataset))
-  
-  min_auc = 1
-  max_auc = 0
-  
-  min_fpr = list()
-  min_tpr = list()
-  
-  max_fpr = list()
-  max_tpr = list()
-  
-  for (i in c(1:10))
-  {
-    sep_data = separate_dataset(dataset)
-    train <- sep_data$train
-    test <- sep_data$test
-    
-    #train the model
-    cox.mod = coxph(formula = as.formula(paste("Surv(surv_years, death_status) ~ ",
-                                               param_str)),
-                    data = train)
-    
-    p_vals <- seq(0.00, 1.0, by=0.005)
-    
-    tpr <- list()
-    fpr <- list()
-    
-    for (p in p_vals)
-    {
-      true_vals <- test$death_status +0 
-      
-      probs <- exp(-predict(cox.mod, test, type="expected"))
-      pred <- (probs < p) +0
-      
-      #true_vals <- true_vals[!is.na(pred)]
-      #pred <- pred[!is.na(pred)]
-      
-      true_predicted <- pred[(pred == true_vals)]
-      false_predicted <- pred[(pred != true_vals)]
-      
-      tp <- sum(true_predicted == 1, na.rm = TRUE)
-      fp <- sum(false_predicted == 1, na.rm = TRUE)
-      
-      tn <- sum(true_predicted == 0, na.rm = TRUE)
-      fn <- sum(false_predicted == 0, na.rm = TRUE)
-      
-      tpr <- append(tpr, tp / (tp + fn))
-      fpr <- append(fpr, fp / (fp + tn))
-    }
-    
-    curr_auc = trapz(unlist(fpr), unlist(tpr))#auc(true_vals, pred)
-    if (curr_auc < min_auc)
-    {
-      min_auc = curr_auc
-      min_fpr = fpr
-      min_tpr = tpr
-    }
-    
-    if (curr_auc > max_auc)
-    {
-      max_auc = curr_auc
-      max_fpr = fpr
-      max_tpr = tpr
-    }
-  }
-  
-  average_fpr <- list()
-  average_tpr <- list()
-  
-  max_fpr <- unlist(max_fpr)
-  min_fpr <- unlist(min_fpr)
-  max_tpr <- unlist(max_tpr)
-  min_tpr <- unlist(min_tpr)
-  
-  max_fpr[1] + min_fpr[1]
-  
-  for (i in 1:length(max_fpr))
-  {
-    average_fpr <- append(average_fpr, (max_fpr[i] + min_fpr[i])/2.0)
-    average_tpr <- append(average_tpr, (max_tpr[i] + min_tpr[i])/2.0)
-  }
-  
-  data <- data.frame(
-    x = unlist(average_fpr),
-    y = unlist(average_tpr),
-    lt = "roc"
-  )
-  data <- rbind(data, data.frame(
-    x = unlist(max_fpr),
-    y = unlist(max_tpr),
-    lt = "upper"
-  ))
-  data <- rbind(data, data.frame(
-    x = unlist(min_fpr),
-    y = unlist(min_tpr),
-    lt = "lower"
-  ))
-  
-  
-  return (list("data"=data, "auc"=((max_auc + min_auc) / 2.0)))
+  #train the model
+  cox.mod = coxph(formula = as.formula(paste("Surv(time, death_status) ~ ",
+                                             param_str)),
+                  data = train)
+  return (cox.mod)
 }
 
-
-train_rf <- function(train, rf_params=NULL, omit_statistics=TRUE)
+pred_coxph <- function(test)
 {
-  x_train = train[,!names(train) %in% c("death_status")]
-  y_train = train[,"death_status"]
-  
-  if (is.null(rf_params))
+  probs <- exp(-predict(cox.mod, test, type="expected"))
+  pred <- (probs < p) + 0
+  return (pred)
+}
+
+train_rf <- function(train, rf_param=NULL, omit_statistics=TRUE)
+{
+  if (is.null(rf_param))
+  {
     return (
-      randomForest(x = x_train,
-                   y = y_train,
-                         
+      randomForest(death_status ~ .,
+                   data=train,
+                   
                    importance = !omit_statistics,
-                   proximity = !omit_statistics,
-                   na.action=na.omit)
-      )
-  else
+                   proximity = !omit_statistics)
+    )
+  }
+  else {
     return (
-      randomForest(x = x_train,
-                   y = y_train,
-                   ntree = rf_params["ntree"],
-                   mtry = rf_params["mtry"],
-                   replace = rf_params["replace"],
-                   sampsize = rf_params["sampsize"],
-                   maxnodes = rf_params["maxnodes"],
+      randomForest(death_status ~ .,
+                   data=train,
+                   
+                   ntree = rf_param$ntree,
+                   mtry = rf_param$mtry,
+                   replace = rf_param$replace,
+                   max.depth = rf_param$max.depth,
                    
                    importance = !omit_statistics,
                    proximity = !omit_statistics,
                    na.action=na.omit)
     )
+  }
 }
 
-preproc_test_rf <- function(test)
+preproc_test_data <- function(test, time_to_predict)
 {
-  predicat_not_dead = ((test$surv_years > age_to_predict) & (test$death_status==1))
+  test = test[!((test$time < time_to_predict) & 
+                          (test$death_status == 0)),]
+  
+  
+  predicat_not_dead = ((test$time > time_to_predict) & (test$death_status==1))
   test[predicat_not_dead,]$death_status <- 0
   return (test)
 }
 
 #predict function for random forest on hazards
-predict_rf <- function(x_test, rf_mod, p, y_age)
+predict_rf <- function(x_test, rf_mod, p, time_to_predict)
 {
-  x_test[,"surv_years"] = y_age
+  x_test[,"time"] = time_to_predict
   probs = predict(rf_mod, x_test)
   pred = (probs > p) + 0
   return (pred)
@@ -265,7 +164,7 @@ train_ds <- function(train, ds_params=NULL, omit_statistics=TRUE)
   if (is.null(ds_params))
   {
     return (
-      deepsurv(formula = as.formula(Surv(surv_years, death_status) ~ .),
+      deepsurv(formula = as.formula(Surv(time, death_status) ~ .),
                data = train,
                frac = 0.3,
                activation = "relu",
@@ -277,24 +176,26 @@ train_ds <- function(train, ds_params=NULL, omit_statistics=TRUE)
     )
   } else {
     return (
-      deepsurv(formula = as.formula(Surv(surv_years, death_status) ~ .),
+      deepsurv(formula = as.formula(Surv(time, death_status) ~ .),
                data = train,
-               frac = ds_params["frac"],
-               activation = ds_params["activation"],
-               num_nodes = ds_params["num_nodes"],
-               dropout = ds_params["dropout"],
-               early_stopping = TRUE,
-               epochs = ds_params["epochs"],
-               batch_size = ds_params["batch_size"])
+               frac = ds_params$frac,
+               activation = ds_params$activation,
+               optimizer = ds_params$optimizer,
+               num_nodes = ds_params$num_nodes,
+               batch_norm = ds_params$batch_norm,
+               dropout = ds_params$dropout,
+               batch_size = ds_params$batch_size,
+               epochs = ds_params$epochs,
+               shuffle = FALSE)
     )
   }
   
 }
 
-predict_ds <- function(x_test, ds.mod, p, y_age)
+predict_ds <- function(x_test, ds.mod, p, time_to_predict)
 {
   probs = predict(ds.mod, x_test, type="survival")
-  ind = match(y_age, colnames(probs))
+  ind = match(time_to_predict, colnames(probs))
   probs = unname(probs[,ind])
   pred = (probs < p) + 0
   return (pred)
@@ -330,16 +231,16 @@ all_params_combn <- function(params, i, param_combs=list(), prev_comb=list())
 
 calculate_roc_scores <- function(x_test, y_test, 
                                  svmod, svmod.predict,
-                                 y_age=NULL)
+                                 time_to_predict=NULL)
 {
-  p_vals <- seq(0.00, 1.0, by=0.005)
+  p_vals <- c(seq(0.00, 1.0, by=0.005), 1.00001)
   
   tpr = c()
   fpr = c()
   
   for (p in p_vals)
   {
-    pred = svmod.predict(x_test, svmod, p, y_age)
+    pred = svmod.predict(x_test, svmod, p, time_to_predict)
     true_predicted = pred[(pred == y_test)]
     false_predicted = pred[(pred != y_test)]
     
@@ -363,6 +264,58 @@ calculate_roc_scores <- function(x_test, y_test,
   )
 }
 
+
+calculate_cindex <- function(test, svmod)
+{
+  cind = concordance(Surv(time, death_status) ~ predict(svmod, test, type="risk"),
+                     test)$concordance
+  return (cind)
+}
+
+calculate_cindex_without_tied <- function(test, svmod)
+{
+  cind = concordance(Surv(time, death_status) ~ predict(svmod, test, type="risk"),
+                     test)$concordance
+  return (cind)
+}
+
+get_max_batch_size <- function(dataset, k_fold)
+{
+  current_batch_size = 16
+  max_batch_num = 4
+  train_set_size = floor(nrow(dataset) / k_fold)
+  while(TRUE)
+  {
+    current_batch_size = current_batch_size * 2
+    if (current_batch_size <= train_set_size)
+      max_batch_num = max_batch_num + 1
+    else
+      break
+  }
+  return (max_batch_num)
+}
+
+get_random_param <- function(params)
+{
+  param = list()
+  for (key in names(params))
+  {
+    if (key == "num_nodes")
+    {
+      num_layers = sample(params$num_nodes$num_layers, size=1)
+      num_nodes = sample(params$num_nodes$num_units,
+                         size = num_layers,
+                         replace=TRUE)
+      param$num_nodes = num_nodes
+    }
+    else
+      param[key] = sample(params[[key]],
+                          size=1,
+                          replace=TRUE)
+  }
+  return (param)
+}
+
 #' Get the best hyperparameters for a model
 #' 
 #' @param dataset A preprocessed dataset, ready to train a model
@@ -375,123 +328,199 @@ calculate_roc_scores <- function(x_test, y_test,
 hyperparams_tuning <- function(dataset,
                                svmod.fit,
                                svmod.predict,
+                               metric,
                                test_drop_cols,
-                               svmod.test.preproc=NULL,
                                params,
-                               k_folds=10, is_random=FALSE)
+                               svmod.test.preproc=NULL,
+                               k_folds=5,
+                               iter_num = 1000,
+                               is_random=FALSE)
 {
-  param_combs = all_params_combn(params, 1)
-  
   #k-fold cv 
   #??first approach (stratification supported). ???
   #require(caret)
   #flds <- createFolds(y, k = n_folds, list = TRUE, returnTrain = FALSE)
   #names(flds)[1] <- "train"
   
-  
-  pb = progress_bar$new(format = "(:spin) [:bar] :percent [Elapsed time: :elapsedfull || Estimated time remaining: :eta]",
-                        total = length(param_combs),
-                        complete = "=",   # Completion bar character
-                        incomplete = "-", # Incomplete bar character
-                        current = ">",    # Current bar character
-                        clear = FALSE,    # If TRUE, clears the bar when finish
-                        width = 100)      # Width of the progress bar
-  
-  #Randomly shuffle the data
-  dataset_shuffled = dataset[sample(nrow(dataset)),]
-  
-  #Create k equally size folds
-  folds <- cut(seq(1,nrow(dataset_shuffled)), breaks=k_folds, labels=FALSE)
-  
-  best_auc = 0
-  best_params = list()
-  
-  for (i in 1:length(param_combs))
+  if (!is_random)
   {
-    pb$tick()
+    param_combs = all_params_combn(params, 1)
+    iter_num = length(param_combs)
+  }
+  
+  
+  #pb = progress_bar$new(format = "(:spin) [:bar] :percent [Elapsed time: :elapsedfull || Estimated time remaining: :eta]",
+  #                      total = iter_num,
+  #                      complete = "=",   # Completion bar character
+  #                      incomplete = "-", # Incomplete bar character
+  #                      current = ">",    # Current bar character
+  #                      clear = FALSE,    # If TRUE, clears the bar when finish
+  #                      width = 100)      # Width of the progress bar
+  
+  best_score = 0
+  best_param = list()
+  tuning_data = list("iteration" = c(), "score" = c(), "param" = c())
+  
+  i = 1
+  while (TRUE)
+  {
+    #Randomly shuffle the data
+    dataset_shuffled = dataset[sample(nrow(dataset)),]
+    
+    #Create k equally size folds
+    folds <- cut(seq(1,nrow(dataset_shuffled)), breaks=k_folds, labels=FALSE)
+    
+    if (is_random)
+    {
+      param = get_random_param(params)
+    }
+    else
+      param = param_combs[[i]]
     
     #Perform k-fold cross validation
-    auc_vector = c()
+    iter_score_vector = c()
     for(j in 1:k_folds)
     {
       testIndexes <- which(folds==j,arr.ind=TRUE)
       test_dataset <- dataset_shuffled[testIndexes, ]
       train_dataset <- dataset_shuffled[-testIndexes, ]
       
-      mod = svmod.fit(train_dataset)
-      
-      x_test = test_dataset %>% dplyr::select(-any_of(test_drop_cols))
-      y_test = test_dataset[,"death_status"]
-      #??c-index (concordance) 
-      auc = calculate_roc_scores(x_test, y_test, mod, svmod.predict, y_age)$auc
-      auc_vector = c(auc_vector, auc)
+      tryCatch(
+        {
+          mod = svmod.fit(train_dataset, param)
+          
+          if (metric == "AUC")
+            preproc_test_data(test_dataset, time_to_predict)
+          
+          x_test = test_dataset %>% dplyr::select(-any_of(test_drop_cols))
+          y_event_test = test_dataset[,"death_status"]
+          y_time_test = test_dataset[,"time"]
+          
+          if (metric == "AUC")
+          {
+            auc = calculate_roc_scores(x_test, y_event_test, mod, svmod.predict, time_to_predict)$auc
+            iter_score_vector = c(iter_score_vector, auc)
+          }
+          else {
+            cind = calculate_cindex_without_tied(test_dataset, mod)
+            iter_score_vector = c(iter_score_vector, cind)
+          }
+        }, error = function(err.msg) {
+          #print(err.msg)
+        })
     }
     
-    average_auc = mean(auc_vector)
-    #
-    if (average_auc > best_auc)
+    if (length(iter_score_vector) != k_folds)
+      next
+    
+    average_score = mean(iter_score_vector)
+    if (average_score > best_score)
     {
-      best_auc = average_auc
-      best_params = param_combs[[i]]
+      best_score = average_score
+      best_param = param
     }
+    print(sprintf("Iter: %i, best score so far: %.4f", i, best_score))
+    tuning_data = append(tuning_data, 
+                         list("iteration" = i,
+                              "score" = average_score,
+                              "param" = param
+                         ))
+    if (i == iter_num)
+      break
+    i = i + 1
+    #pb$tick()
   }
   
-  return (best_params)
+  return (list("best_param" = best_param,
+               "best_score" = best_score,
+               "tuning_data" = tuning_data))
 }
 
 get_best_model_data <- function(dataset,
                                 svmod.fit,
                                 svmod.predict,
                                 test_drop_cols,
-                                svmod.test.preproc=NULL,
-                                steps_num=10,
-                                y_age=NULL)
+                                param=NULL,
+                                steps_num=5,
+                                inner_steps_num=10,
+                                time_to_predict=NULL)
 {
+  #options(warn=2)
+  sd = separate_dataset(dataset, frac=0.85)
+  dataset = sd$train
+  validation = sd$test
+  
+  validation = preproc_test_data(validation, time_to_predict)
+  x_validation = validation %>% dplyr::select(-any_of(test_drop_cols))
+  y_validation = validation[,"death_status"]
+  
   min_auc = 1
   max_auc = 0
   min_fpr = c()
   min_tpr = c()
   max_fpr = c()
   max_tpr = c()
-  
-  pb = progress_bar$new(format = "(:spin) [:bar] :percent [Elapsed time: :elapsedfull || Estimated time remaining: :eta]",
-                        total = steps_num,
-                        complete = "=",   # Completion bar character
-                        incomplete = "-", # Incomplete bar character
-                        current = ">",    # Current bar character
-                        clear = FALSE,    # If TRUE, clears the bar when finish
-                        width = 100)      # Width of the progress bar
-  
   df_train_vector = c()
   auc_vector = c()
-  min_mod = NULL
-  min_test = NULL
   
-  for (i in c(1:steps_num))
+  i = 1
+  while(TRUE)
   {
-    pb$tick()
+    #pb = progress_bar$new(format = "(:spin) [:bar] :percent [Elapsed time: :elapsedfull || Estimated time remaining: :eta]",
+    #                      total = steps_num,
+    #                      complete = "=",   # Completion bar character
+    #                      incomplete = "-", # Incomplete bar character
+    #                      current = ">",    # Current bar character
+    #                      clear = FALSE,    # If TRUE, clears the bar when finish
+    #                      width = 100)      # Width of the progress bar
     
-    sd = separate_dataset(dataset)
-    train = sd$train
-    test = sd$test
+    current_max_auc = 0
+    best_mod = NULL
+    current_best_train = NULL
     
-    df_train_vector = c(df_train_vector, list(train))
+    j = 1
+    while (TRUE)
+    {
+      #pb$tick()
+      
+      tryCatch(
+        {
+          
+          sd = separate_dataset(dataset, frac=0.85)
+          train = sd$train
+          test = sd$test
+          
+          #trained model
+          mod = svmod.fit(train)
+          test = preproc_test_data(test, time_to_predict)
+          x_test = test %>% dplyr::select(-any_of(test_drop_cols))
+          y_test = test[,"death_status"]
+          roc_scores = calculate_roc_scores(x_test, y_test,
+                                            mod, svmod.predict,
+                                            time_to_predict)
+          curr_auc = roc_scores$auc
+          if (curr_auc >  current_max_auc)
+          {
+            best_mod = mod
+            current_best_train = train
+            current_max_auc = curr_auc
+          }
+          
+          if (j == steps_num)
+            break
+          
+          j = j + 1
+        }, error = function(err.msg) {
+          #print(err.msg)
+        })
+    }
     
-    #trained model
-    mod = svmod.fit(train)
+    df_train_vector = c(df_train_vector, list(current_best_train))
     
-    if (!is.null(svmod.test.preproc))
-      test = svmod.test.preproc(test)
-    x_test = test %>% dplyr::select(-any_of(test_drop_cols))
-    y_test = test[,"death_status"]
-    
-    roc_scores = calculate_roc_scores(x_test, y_test,
-                                      mod, svmod.predict,
-                                      y_age)
-    
+    roc_scores = calculate_roc_scores(x_validation, y_validation,
+                                      best_mod, svmod.predict,
+                                      time_to_predict)
     curr_auc = roc_scores$auc
-    auc_vector = c(auc_vector, curr_auc)
-    
     if (curr_auc < min_auc)
     {
       min_auc = curr_auc
@@ -505,32 +534,40 @@ get_best_model_data <- function(dataset,
       max_fpr = roc_scores$fpr
       max_tpr = roc_scores$tpr
     }
+    
+    average_auc = (max_auc + min_auc) / 2.0
+    auc_vector = c(auc_vector, average_auc)
+    
+    print(sprintf("Iter: %i, average score so far: %.4f", i, average_auc))
+    
+    if (i == inner_steps_num)
+      break
+    
+    i = i + 1
   }
-  
-  average_auc = (max_auc + min_auc) / 2.0
   
   min_dist = .Machine$double.xmax
   min_index = 0
-  for (i in 1:length(auc_vector))
+  for (j in 1:length(auc_vector))
   {
-    dist = abs(average_auc - auc_vector[i])
+    dist = abs(average_auc - auc_vector[j])
     if (min_dist > dist)
     {
       min_dist = dist
-      min_index = i
+      min_index = j
     }
   }
-    
+  
   average_mod = svmod.fit(df_train_vector[[min_index]],
                           omit_statistics=FALSE)
   
   average_fpr = c()
   average_tpr = c()
   
-  for (i in 1:length(max_fpr))
+  for (j in 1:length(max_fpr))
   {
-    average_fpr = c(average_fpr, (max_fpr[i] + min_fpr[i])/2.0)
-    average_tpr = c(average_tpr, (max_tpr[i] + min_tpr[i])/2.0)
+    average_fpr = c(average_fpr, (max_fpr[j] + min_fpr[j])/2.0)
+    average_tpr = c(average_tpr, (max_tpr[j] + min_tpr[j])/2.0)
   }
   
   roc_data <- data.frame(
@@ -549,6 +586,7 @@ get_best_model_data <- function(dataset,
     lt = "lower"
   ))
   
+  options(warn=0)
   return (list("ROC"=roc_data,
                "mod"=average_mod,
                "auc"=average_auc))

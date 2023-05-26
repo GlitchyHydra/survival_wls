@@ -1,24 +1,12 @@
+
+need_to_instal = names(which(sapply(c("haven", "progress", "dplyr"),
+                                    function(x) !require(x, character.only = TRUE))))
+if (length(need_to_instal) > 0)
+  install.packages(need_to_install)
+
 library(haven)
 library(progress)
 library(dplyr)
-
-
-#table(df_surv[df_surv$start_year == -1,]$z_livgrad)
-#table(df_surv[df_surv$start_year == -1,]$rtype)
-#table(df_surv[df_surv$start_year == -1,]$z_wrwoud)
-#table(df_surv[df_surv$start_year == -1,]$z_age75)
-#table(df_surv[df_surv$start_year == -1,]$z_ra016rey)
-#table(df_surv[df_surv$start_year == -1,]$z_ga003re)
-#table(df_surv[df_surv$start_year == -1,]$z_ha003re)
-#table(df_surv[df_surv$start_year == -1,]$z_q1a003re)
-#table(df_surv[df_surv$time == 0,]$start_year)
-#table(df_surv[df_surv$time == 0,]$z_livgrad)
-#table(df_surv[df_surv$time == 1,]$z_livgrad)
-#table(df_surv[df_surv$time == 2,]$z_livgrad)
-#table(df_surv[df_surv$time == 3,]$z_livgrad)
-#table(df_surv[df_surv$time == 4,]$z_livgrad)
-#table(df_surv[df_surv$time == 5,]$z_livgrad)
-#table(df_surv[df_surv$time == 6,]$z_livgrad)
 
 #table(df_surv[df_surv$time == 1,]$start_year)
 #11 have died at the same year of the first interview,
@@ -161,7 +149,7 @@ read_wls_dataset <- function(filename="wls_bl_14.01.sas/wls_bl_14_01.sas7bdat",
   #get death_status from z_livgrad
   df_surv$death_status = df_surv$z_livgrad - 1
   
-  #remove who had died the same year (457 individuals) 
+  #remove who was only on one interview (457 individuals) 
   df_surv = df_surv[df_surv$time != 0,]
   
   #15066 left
@@ -169,10 +157,30 @@ read_wls_dataset <- function(filename="wls_bl_14.01.sas/wls_bl_14_01.sas7bdat",
   #9825 alive
   #5241 dead
   
-  #remove additional columns
-  df_surv = df_surv %>% dplyr::select(-any_of(c("start_year", "end_year", "z_livgrad")))
+  colnames1 <- read.csv("data/r1_colnames.txt", header=FALSE)
+  colnames2 <- read.csv("data/r2_colnames.txt", header=FALSE)
   
+  #remove additional columns
+  df_surv = df_surv %>% dplyr::select(-any_of(c(colnames1$V1, colnames2$V1,
+                                                "start_year", "end_year", "z_livgrad",
+                                                "z_q1a003re", " z_ha003re", "z_ga003re",
+                                                "z_ra016rey", "z_age75")))
+  #TODO drop "z_deatyr" 
   return (df_surv)
+}
+
+remove_highly_correlated <- function(filename,
+                                     dataset,
+                                     upper_threshold=1e-90)
+{
+  path = paste("results/features impact/", filename, sep="")
+  features_impact <- read.csv(path)
+  
+  #remove highly correlated variables, that can clearly separate death case
+  features_impact <- features_impact[features_impact$p_value > 0,]
+  features_impact <- features_impact[features_impact$p_value > upper_threshold,]
+  cols_to_include = c(features_impact$feature_name, "death_status", "time")
+  return(dataset %>% dplyr::select(any_of(cols_to_include)))
 }
 
 #' Read the table with information about variables effect.
@@ -190,8 +198,7 @@ read_features_effect <- function(filename,
   path = paste("results/features impact/", filename, sep="")
   features_impact <- read.csv(path)
   
-  #remove highly correlated variables, that can predict death case
-  #with approximate 100% accuracy
+  #remove highly correlated variables, that can clearly separate death case
   features_impact <- features_impact[features_impact$p_value > 0,]
   
   if (remove_highly_correlated)
@@ -223,7 +230,7 @@ preprocess_dataset <- function(dataset)
   {
     pb$tick()
     
-    if (col %in% c("death_status", "surv_years") || !is.factor(dataset[,col]))
+    if (col %in% c("death_status", "time") || !is.factor(dataset[,col]))
       next
     
     lvls = levels(dataset[,col])
@@ -258,15 +265,50 @@ transform_columns <- function(dataset, df_features_effect)
 {
   for (col in colnames(dataset))
   {
-    if (col == "death_status" | col == "surv_years")
+    if (col == "death_status" | col == "time" | col == "age" | 
+        col == "pgs_dep_gwas" | col == "pgs_dep_mtag")
       next
+    
+    if (col == "depression_status")
+    {
+      dataset$depression_status = as.factor(dataset$depression_status)
+      next
+    }
     
     row = df_features_effect[df_features_effect$feature_name == col,]
     row = row[1,]
-    if (nrow(row) == 1 && row$is_cat)
+    if (row$is_cat)
     {
       dataset[,row$feature_name] <- as.factor(dataset[,row$feature_name])
     }
   }
   return (dataset)
+}
+
+get_depression_dataset <- function(dataset)
+{
+  threshold_dep = 18
+  dataset <- dataset[,c("z_mu001rec", "z_iu001rec", "z_ju001rec", "pgs_dep_mtag")]
+  dataset$depression_status <- -1
+  
+  dataset[!is.na(dataset$z_mu001rec) &
+                         (dataset$z_mu001rec >= 0) &
+                         (dataset$z_mu001rec < threshold_dep), ]$depression_status <- 0
+  dataset[!is.na(dataset$z_iu001rec) &
+                         (dataset$z_iu001rec >= 0) &
+                         (dataset$z_iu001rec < threshold_dep), ]$depression_status <- 0
+  dataset[!is.na(dataset$z_ju001rec) &
+                         (dataset$z_ju001rec >= 0) &
+                         (dataset$z_ju001rec < threshold_dep), ]$depression_status <- 0
+  
+  dataset[!is.na(dataset$z_mu001rec) &
+                         (dataset$z_mu001rec >= threshold_dep), ]$depression_status <- 1
+  dataset[!is.na(dataset$z_iu001rec) &
+                         (dataset$z_iu001rec >= threshold_dep), ]$depression_status <- 1
+  dataset[!is.na(dataset$z_ju001rec) &
+                         (dataset$z_ju001rec >= threshold_dep), ]$depression_status <- 1
+  
+  return (
+    dataset %>% dplyr::select(-any_of(c("z_mu001rec", "z_iu001rec", "z_ju001rec")))
+  )
 }
